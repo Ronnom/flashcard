@@ -67,8 +67,7 @@ class _QuizPageState extends State<QuizPage> {
       // Reset to first card and clear answers when shuffling
       _currentCardIndex = 0;
       _canSwipe = false;
-      _correctAnswers = 0; // Reset correct answers count
-      userAnswers.clear(); // Clear all user answers
+      // Do not reset _correctAnswers and userAnswers
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
