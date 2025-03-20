@@ -115,7 +115,7 @@ class _QuizPageState extends State<QuizPage> {
 
     // Prevent division by zero
     double progress =
-        totalAnswered > 0 ? (correctAnswers / totalAnswered) * 100 : 0;
+        keys.length > 0 ? (correctAnswers / keys.length) * 100 : 0;
 
     showDialog(
       context: context,
