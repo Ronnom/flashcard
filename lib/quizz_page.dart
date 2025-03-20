@@ -64,10 +64,8 @@ class _QuizPageState extends State<QuizPage> {
     }
 
     setState(() {
-      // Reset to first card and clear answers when shuffling
-      _currentCardIndex = 0;
+      // Do not reset _currentCardIndex when shuffling
       _canSwipe = false;
-      // Do not reset _correctAnswers and userAnswers
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -685,7 +683,12 @@ class _QuizPageState extends State<QuizPage> {
                                 icon: const Icon(Icons.arrow_back),
                                 label: const Text('Previous'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.deepPurple.shade300,
+                                  backgroundColor: const Color.fromARGB(
+                                    255,
+                                    133,
+                                    166,
+                                    153,
+                                  ),
                                 ),
                               ),
                               ElevatedButton.icon(
@@ -693,7 +696,12 @@ class _QuizPageState extends State<QuizPage> {
                                 icon: const Icon(Icons.arrow_forward),
                                 label: const Text('Next'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.deepPurple,
+                                  backgroundColor: const Color.fromARGB(
+                                    255,
+                                    133,
+                                    166,
+                                    153,
+                                  ),
                                 ),
                               ),
                             ],
@@ -707,13 +715,6 @@ class _QuizPageState extends State<QuizPage> {
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: submitQuiz,
-        backgroundColor: Colors.deepPurple,
-        elevation: 5,
-        tooltip: 'Submit Quiz',
-        child: const Icon(Icons.check, color: Colors.white),
       ),
     );
   }
