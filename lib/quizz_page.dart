@@ -18,6 +18,7 @@ class _QuizPageState extends State<QuizPage> {
   bool _isShuffled = false;
   int _currentCardIndex = 0;
   bool _canSwipe = false;
+  int _correctAnswers = 0; // Track correct answers
 
   @override
   void initState() {
@@ -66,6 +67,8 @@ class _QuizPageState extends State<QuizPage> {
       // Reset to first card and clear answers when shuffling
       _currentCardIndex = 0;
       _canSwipe = false;
+      _correctAnswers = 0; // Reset correct answers count
+      userAnswers.clear(); // Clear all user answers
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -213,6 +216,32 @@ class _QuizPageState extends State<QuizPage> {
     });
   }
 
+  // Calculate current progress percentage
+  double _calculateProgress() {
+    if (flashcardBox.isEmpty) return 0.0;
+
+    List<dynamic> keys =
+        _isShuffled ? _shuffledKeys : flashcardBox.keys.toList();
+
+    // Count correct answers
+    _correctAnswers = 0;
+    for (var key in keys) {
+      if (userAnswers.containsKey(key)) {
+        final flashcard = flashcardBox.get(key);
+        if (flashcard != null) {
+          bool isCorrect =
+              flashcard.answer.trim().toLowerCase() ==
+              userAnswers[key]?.trim().toLowerCase();
+          if (isCorrect) {
+            _correctAnswers++;
+          }
+        }
+      }
+    }
+
+    return (keys.length > 0) ? (_correctAnswers / keys.length) * 100 : 0.0;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (flashcardBox.isEmpty) {
@@ -291,6 +320,9 @@ class _QuizPageState extends State<QuizPage> {
       });
     }
 
+    // Calculate current progress
+    double progressPercentage = _calculateProgress();
+
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -328,14 +360,59 @@ class _QuizPageState extends State<QuizPage> {
             // Progress indicator
             Padding(
               padding: const EdgeInsets.all(8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              child: Column(
                 children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'Question ${_currentCardIndex + 1} of ${flashcardsToShow.length}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Progress bar
+                  Container(
+                    width: MediaQuery.of(context).size.width * 0.9,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      color: Colors.grey.shade200,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width:
+                              MediaQuery.of(context).size.width *
+                              0.9 *
+                              (progressPercentage / 100),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10),
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.green.shade300,
+                                Colors.green.shade500,
+                              ],
+                              begin: Alignment.centerLeft,
+                              end: Alignment.centerRight,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // Progress percentage
                   Text(
-                    'Question ${_currentCardIndex + 1} of ${flashcardsToShow.length}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                    'Progress: ${progressPercentage.toStringAsFixed(1)}% (${_correctAnswers} correct out of ${flashcardsToShow.length})',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.deepPurple.shade700,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -538,6 +615,8 @@ class _QuizPageState extends State<QuizPage> {
                                             // Only allow selection if not ready to swipe
                                             setState(() {
                                               userAnswers[key] = choice;
+                                              // Recalculate progress after answer
+                                              _calculateProgress();
                                             });
                                           }
                                         },
