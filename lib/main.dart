@@ -360,9 +360,9 @@ class _HomePageState extends State<HomePage> {
 
   Widget _getScoreEmoji(double score) {
     String emoji;
-    if (score >= 90)
+    if (score >= 90) {
       emoji = '🌟';
-    else if (score >= 80)
+    } else if (score >= 80)
       emoji = '🎉';
     else if (score >= 70)
       emoji = '😊';

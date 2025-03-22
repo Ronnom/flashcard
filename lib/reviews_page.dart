@@ -306,7 +306,7 @@ class FlipCard extends StatelessWidget {
 class _FlashcardFront extends StatelessWidget {
   final Flashcard flashcard;
 
-  const _FlashcardFront({required this.flashcard, Key? key}) : super(key: key);
+  const _FlashcardFront({required this.flashcard, super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -359,7 +359,7 @@ class _FlashcardFront extends StatelessWidget {
 class _FlashcardBack extends StatelessWidget {
   final Flashcard flashcard;
 
-  const _FlashcardBack({required this.flashcard, Key? key}) : super(key: key);
+  const _FlashcardBack({required this.flashcard, super.key});
 
   @override
   Widget build(BuildContext context) {

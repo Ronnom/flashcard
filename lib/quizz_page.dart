@@ -108,7 +108,7 @@ class _QuizPageState extends State<QuizPage> {
 
     // Prevent division by zero
     double progress =
-        _quizCards.length > 0 ? (correctAnswers / _quizCards.length) * 100 : 0;
+        _quizCards.isNotEmpty ? (correctAnswers / _quizCards.length) * 100 : 0;
 
     // Store the quiz result
     quizResultsBox.add(QuizResult(score: progress, date: DateTime.now()));
@@ -225,7 +225,7 @@ class _QuizPageState extends State<QuizPage> {
       }
     }
 
-    return (_quizCards.length > 0)
+    return (_quizCards.isNotEmpty)
         ? (_correctAnswers / _quizCards.length) * 100
         : 0.0;
   }
@@ -399,7 +399,7 @@ class _QuizPageState extends State<QuizPage> {
                   const SizedBox(height: 4),
                   // Progress percentage
                   Text(
-                    'Progress: ${progressPercentage.toStringAsFixed(1)}% (${_correctAnswers} correct out of ${_quizCards.length})',
+                    'Progress: ${progressPercentage.toStringAsFixed(1)}% ($_correctAnswers correct out of ${_quizCards.length})',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.deepPurple.shade700,
