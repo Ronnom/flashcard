@@ -88,7 +88,7 @@ class _FlashcardPageState extends State<FlashcardPage> {
         ),
         Flashcard(
           category: 'Everyday Basics',
-          question: "You're Welcome",
+          question: "What are you going to say when someone says thankyou?",
           answer: "You're Welcome",
         ),
         Flashcard(category: 'Body Parts', question: 'Head', answer: 'Head'),
@@ -358,7 +358,7 @@ class _FlashcardPageState extends State<FlashcardPage> {
                   Icons.volume_up,
                   color: isColors ? Colors.white : Colors.black,
                 ),
-                onPressed: () => _speak(flashcard.question),
+                onPressed: () => _speak(flashcard.answer), // Read the answer
                 tooltip: 'Read Aloud',
               ),
             ),

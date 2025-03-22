@@ -14,6 +14,7 @@ class _ReviewPageState extends State<ReviewPage> {
   final Map<int, bool> _isFlippedMap = {};
   List<int> _shuffledKeys = []; // Store the shuffled keys
   bool _isShuffled = false; // Track if we're in shuffled mode
+  int _currentIndex = 0; // Keep track of the current flashcard index
 
   @override
   void initState() {
@@ -51,6 +52,8 @@ class _ReviewPageState extends State<ReviewPage> {
         _isShuffled = false;
         _shuffledKeys = [];
       }
+      // Reset to first card
+      _currentIndex = 0;
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -60,6 +63,56 @@ class _ReviewPageState extends State<ReviewPage> {
         ),
       ),
     );
+  }
+
+  void _nextCard() {
+    if (flashcardBox.isEmpty) return;
+
+    setState(() {
+      _currentIndex = (_currentIndex + 1) % _getFlashcardsToShow().length;
+      // Reset flip state when changing cards
+      final currentKey = _getFlashcardsToShow()[_currentIndex].key;
+      _isFlippedMap[currentKey] = false;
+    });
+  }
+
+  void _previousCard() {
+    if (flashcardBox.isEmpty) return;
+
+    setState(() {
+      _currentIndex =
+          (_currentIndex - 1 + _getFlashcardsToShow().length) %
+          _getFlashcardsToShow().length;
+      // Reset flip state when changing cards
+      final currentKey = _getFlashcardsToShow()[_currentIndex].key;
+      _isFlippedMap[currentKey] = false;
+    });
+  }
+
+  // Helper to get the list of flashcards to show
+  List<MapEntry<int, Flashcard>> _getFlashcardsToShow() {
+    List<MapEntry<int, Flashcard>> flashcardsToShow = [];
+
+    if (_isShuffled && _shuffledKeys.isNotEmpty) {
+      // Use shuffled keys
+      for (var key in _shuffledKeys) {
+        final flashcard = flashcardBox.get(key);
+        if (flashcard != null) {
+          flashcardsToShow.add(MapEntry(key, flashcard));
+        }
+      }
+    } else {
+      // Use normal order
+      for (int i = 0; i < flashcardBox.length; i++) {
+        final key = flashcardBox.keyAt(i);
+        final flashcard = flashcardBox.getAt(i);
+        if (flashcard != null) {
+          flashcardsToShow.add(MapEntry(key, flashcard));
+        }
+      }
+    }
+
+    return flashcardsToShow;
   }
 
   @override
@@ -88,27 +141,18 @@ class _ReviewPageState extends State<ReviewPage> {
       );
     }
 
-    // Determine which flashcards to show based on shuffle state
-    List<MapEntry<int, Flashcard>> flashcardsToShow = [];
+    // Get current flashcards
+    final flashcardsToShow = _getFlashcardsToShow();
 
-    if (_isShuffled && _shuffledKeys.isNotEmpty) {
-      // Use shuffled keys
-      for (var key in _shuffledKeys) {
-        final flashcard = flashcardBox.get(key);
-        if (flashcard != null) {
-          flashcardsToShow.add(MapEntry(key, flashcard));
-        }
-      }
-    } else {
-      // Use normal order
-      for (int i = 0; i < flashcardBox.length; i++) {
-        final key = flashcardBox.keyAt(i);
-        final flashcard = flashcardBox.getAt(i);
-        if (flashcard != null) {
-          flashcardsToShow.add(MapEntry(key, flashcard));
-        }
-      }
+    // Make sure current index is valid
+    if (_currentIndex >= flashcardsToShow.length) {
+      _currentIndex = 0;
     }
+
+    final entry = flashcardsToShow[_currentIndex];
+    final key = entry.key;
+    final flashcard = entry.value;
+    final isFlipped = _isFlippedMap[key] ?? false;
 
     return Scaffold(
       appBar: AppBar(
@@ -142,33 +186,72 @@ class _ReviewPageState extends State<ReviewPage> {
             end: Alignment.bottomRight,
           ),
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: GridView.builder(
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2, // Changed to 2 for better viewing on mobile
-              crossAxisSpacing: 12.0,
-              mainAxisSpacing: 12.0,
-              childAspectRatio: 1,
-            ),
-            itemCount: flashcardsToShow.length,
-            itemBuilder: (context, index) {
-              final entry = flashcardsToShow[index];
-              final key = entry.key;
-              final flashcard = entry.value;
-
-              final isFlipped = _isFlippedMap[key] ?? false;
-
-              return GestureDetector(
-                onTap: () => _toggleFlip(key),
-                child: FlipCard(
-                  isFlipped: isFlipped,
-                  front: _FlashcardFront(flashcard: flashcard),
-                  back: _FlashcardBack(flashcard: flashcard),
+        child: Column(
+          children: [
+            // Card counter
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'Card ${_currentIndex + 1} of ${flashcardsToShow.length}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.deepPurple,
                 ),
-              );
-            },
-          ),
+              ),
+            ),
+
+            // Flashcard
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: GestureDetector(
+                  onTap: () => _toggleFlip(key),
+                  child: FlipCard(
+                    isFlipped: isFlipped,
+                    front: _FlashcardFront(flashcard: flashcard),
+                    back: _FlashcardBack(flashcard: flashcard),
+                  ),
+                ),
+              ),
+            ),
+
+            // Navigation buttons
+            Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _previousCard,
+                    icon: const Icon(Icons.arrow_back),
+                    label: const Text('Previous'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: _nextCard,
+                    icon: const Icon(Icons.arrow_forward),
+                    label: const Text('Next'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -232,32 +315,36 @@ class _FlashcardFront extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       color: Colors.white,
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
               flashcard.category,
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              style: TextStyle(fontSize: 18, color: Colors.grey[600]),
               textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 8),
-            Text(
-              flashcard.question,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.deepPurple,
+            const SizedBox(height: 16),
+            Expanded(
+              child: Center(
+                child: SingleChildScrollView(
+                  child: Text(
+                    flashcard.question,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.deepPurple,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               ),
-              textAlign: TextAlign.center,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             const Text(
               "Tap to flip",
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 14,
                 fontStyle: FontStyle.italic,
                 color: Colors.grey,
               ),
@@ -281,26 +368,30 @@ class _FlashcardBack extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
       color: Colors.deepPurple,
       child: Padding(
-        padding: const EdgeInsets.all(12.0),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              flashcard.answer,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+            Expanded(
+              child: Center(
+                child: SingleChildScrollView(
+                  child: Text(
+                    flashcard.answer,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               ),
-              textAlign: TextAlign.center,
-              maxLines: 4,
-              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             const Text(
               "Tap to flip back",
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 14,
                 fontStyle: FontStyle.italic,
                 color: Colors.white70,
               ),

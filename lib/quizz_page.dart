@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'flashcards.dart';
+import 'quiz_result.dart'; // Import the QuizResult model
 
 class QuizPage extends StatefulWidget {
   const QuizPage({super.key});
@@ -12,18 +13,53 @@ class QuizPage extends StatefulWidget {
 
 class _QuizPageState extends State<QuizPage> {
   late Box<Flashcard> flashcardBox;
+  late Box<QuizResult> quizResultsBox; // Box for storing quiz results
   Map<dynamic, String> userAnswers = {};
   final FlutterTts flutterTts = FlutterTts();
-  List<dynamic> _shuffledKeys = [];
-  bool _isShuffled = false;
+  List<MapEntry<dynamic, Flashcard>> _quizCards = [];
   int _currentCardIndex = 0;
   bool _canSwipe = false;
   int _correctAnswers = 0; // Track correct answers
+  static const int _quizSize = 10; // Fixed quiz size of 10 flashcards
 
   @override
   void initState() {
     super.initState();
     flashcardBox = Hive.box<Flashcard>('flashcards');
+    quizResultsBox = Hive.box<QuizResult>(
+      'quizResults',
+    ); // Initialize quiz results box
+    _selectRandomFlashcards();
+  }
+
+  // Function to select 10 random flashcards for the quiz
+  void _selectRandomFlashcards() {
+    if (flashcardBox.isEmpty) {
+      return;
+    }
+
+    // Create a list of all flashcard entries
+    List<MapEntry<dynamic, Flashcard>> allCards = [];
+    for (var i = 0; i < flashcardBox.length; i++) {
+      var key = flashcardBox.keyAt(i);
+      var flashcard = flashcardBox.getAt(i);
+      if (flashcard != null) {
+        allCards.add(MapEntry(key, flashcard));
+      }
+    }
+
+    // Shuffle all cards
+    allCards.shuffle();
+
+    // Take only the first 10 cards (or less if there aren't 10)
+    _quizCards = allCards.take(_quizSize).toList();
+
+    setState(() {
+      _currentCardIndex = 0;
+      _correctAnswers = 0;
+      userAnswers = {};
+      _canSwipe = false;
+    });
   }
 
   // Function to read aloud the question
@@ -38,50 +74,9 @@ class _QuizPageState extends State<QuizPage> {
     }
   }
 
-  // New function to shuffle flashcards
-  void _shuffleFlashcards() {
-    if (flashcardBox.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No flashcards to shuffle!')),
-      );
-      return;
-    }
-
-    if (!_isShuffled) {
-      // Create a list of all flashcard keys
-      _shuffledKeys = [];
-      for (var i = 0; i < flashcardBox.length; i++) {
-        _shuffledKeys.add(flashcardBox.keyAt(i));
-      }
-
-      // Shuffle the list
-      _shuffledKeys.shuffle();
-      _isShuffled = true;
-    } else {
-      // Turn off shuffling
-      _isShuffled = false;
-      _shuffledKeys = [];
-    }
-
-    setState(() {
-      // Do not reset _currentCardIndex when shuffling
-      _canSwipe = false;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _isShuffled
-              ? 'Quiz questions shuffled!'
-              : 'Returned to original order',
-        ),
-      ),
-    );
-  }
-
   // Function to submit the quiz and calculate results
   void submitQuiz() {
-    if (flashcardBox.isEmpty) {
+    if (_quizCards.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No flashcards available for the quiz')),
       );
@@ -91,13 +86,11 @@ class _QuizPageState extends State<QuizPage> {
     int correctAnswers = 0;
     int totalAnswered = 0;
 
-    // Get the list of flashcard keys based on current mode (shuffled or not)
-    List<dynamic> keys =
-        _isShuffled ? _shuffledKeys : flashcardBox.keys.toList();
+    for (var entry in _quizCards) {
+      var key = entry.key;
+      var flashcard = entry.value;
 
-    for (var key in keys) {
-      final flashcard = flashcardBox.get(key);
-      if (flashcard != null && userAnswers.containsKey(key)) {
+      if (userAnswers.containsKey(key)) {
         totalAnswered++;
         bool isCorrect =
             flashcard.answer.trim().toLowerCase() ==
@@ -115,7 +108,10 @@ class _QuizPageState extends State<QuizPage> {
 
     // Prevent division by zero
     double progress =
-        keys.length > 0 ? (correctAnswers / keys.length) * 100 : 0;
+        _quizCards.length > 0 ? (correctAnswers / _quizCards.length) * 100 : 0;
+
+    // Store the quiz result
+    quizResultsBox.add(QuizResult(score: progress, date: DateTime.now()));
 
     showDialog(
       context: context,
@@ -138,12 +134,22 @@ class _QuizPageState extends State<QuizPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Answered $totalAnswered out of ${keys.length} questions',
+                  'Answered $totalAnswered out of ${_quizCards.length} questions',
                   style: const TextStyle(fontSize: 16, color: Colors.grey),
                 ),
               ],
             ),
             actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _selectRandomFlashcards(); // Generate a new quiz set
+                },
+                child: const Text(
+                  'New Quiz',
+                  style: TextStyle(fontSize: 18, color: Colors.deepPurple),
+                ),
+              ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text(
@@ -160,43 +166,39 @@ class _QuizPageState extends State<QuizPage> {
 
   // Move to next card
   void _nextCard() {
-    if (!_canSwipe) return;
-
-    List<dynamic> keys =
-        _isShuffled ? _shuffledKeys : flashcardBox.keys.toList();
-
-    if (_currentCardIndex < keys.length - 1) {
+    if (_currentCardIndex < _quizCards.length - 1) {
       setState(() {
         _currentCardIndex++;
         _canSwipe = false; // Reset swipe permission for new card
       });
     } else {
-      // At the end of the deck
+      // At the end of the quiz
       showDialog(
         context: context,
         builder:
             (context) => AlertDialog(
-              title: const Text('End of Quiz'),
+              title: const Text(
+                'Congratulations! 🎉',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.deepPurple,
+                ),
+              ),
               content: const Text(
-                'You have reached the end of the quiz. Would you like to see your results?',
+                'You have completed the quiz! Great job!',
+                style: TextStyle(fontSize: 18, color: Colors.black87),
               ),
               actions: [
                 TextButton(
                   onPressed: () {
-                    Navigator.pop(context);
-                    submitQuiz();
+                    Navigator.pop(context); // Close the dialog
+                    submitQuiz(); // Automatically show the quiz results
                   },
-                  child: const Text('See Results'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    setState(() {
-                      _currentCardIndex = 0; // Reset to beginning
-                      _canSwipe = false;
-                    });
-                  },
-                  child: const Text('Start Over'),
+                  child: const Text(
+                    'OK',
+                    style: TextStyle(fontSize: 18, color: Colors.deepPurple),
+                  ),
                 ),
               ],
             ),
@@ -204,39 +206,60 @@ class _QuizPageState extends State<QuizPage> {
     }
   }
 
-  // Move to previous card
-  void _previousCard() {
-    setState(() {
-      if (_currentCardIndex > 0) {
-        _currentCardIndex--;
-      }
-    });
-  }
-
   // Calculate current progress percentage
   double _calculateProgress() {
-    if (flashcardBox.isEmpty) return 0.0;
-
-    List<dynamic> keys =
-        _isShuffled ? _shuffledKeys : flashcardBox.keys.toList();
+    if (_quizCards.isEmpty) return 0.0;
 
     // Count correct answers
     _correctAnswers = 0;
-    for (var key in keys) {
+    for (var entry in _quizCards) {
+      var key = entry.key;
       if (userAnswers.containsKey(key)) {
-        final flashcard = flashcardBox.get(key);
-        if (flashcard != null) {
-          bool isCorrect =
-              flashcard.answer.trim().toLowerCase() ==
-              userAnswers[key]?.trim().toLowerCase();
-          if (isCorrect) {
-            _correctAnswers++;
-          }
+        var flashcard = entry.value;
+        bool isCorrect =
+            flashcard.answer.trim().toLowerCase() ==
+            userAnswers[key]?.trim().toLowerCase();
+        if (isCorrect) {
+          _correctAnswers++;
         }
       }
     }
 
-    return (keys.length > 0) ? (_correctAnswers / keys.length) * 100 : 0.0;
+    return (_quizCards.length > 0)
+        ? (_correctAnswers / _quizCards.length) * 100
+        : 0.0;
+  }
+
+  // Handle answer selection - now with auto-advance for wrong answers
+  void _handleAnswerSelection(dynamic key, String choice, Flashcard flashcard) {
+    if (!_canSwipe) {
+      setState(() {
+        userAnswers[key] = choice;
+        bool isCorrect =
+            flashcard.answer.trim().toLowerCase() ==
+            choice.trim().toLowerCase();
+
+        if (isCorrect) {
+          // If correct, allow user to manually advance
+          _canSwipe = true;
+        } else {
+          // If incorrect, show brief feedback then automatically advance
+          Future.delayed(const Duration(milliseconds: 800), () {
+            if (_currentCardIndex < _quizCards.length - 1) {
+              setState(() {
+                _currentCardIndex++;
+              });
+            } else {
+              // Last question and wrong answer, show results
+              submitQuiz();
+            }
+          });
+        }
+
+        // Recalculate progress after answer
+        _calculateProgress();
+      });
+    }
   }
 
   @override
@@ -261,43 +284,24 @@ class _QuizPageState extends State<QuizPage> {
       );
     }
 
-    // Get the current flashcard
-    List<MapEntry<dynamic, Flashcard>> flashcardsToShow = [];
-
-    if (_isShuffled && _shuffledKeys.isNotEmpty) {
-      for (var key in _shuffledKeys) {
-        var flashcard = flashcardBox.get(key);
-        if (flashcard != null) {
-          flashcardsToShow.add(MapEntry(key, flashcard));
-        }
-      }
-    } else {
-      for (var i = 0; i < flashcardBox.length; i++) {
-        var key = flashcardBox.keyAt(i);
-        var flashcard = flashcardBox.getAt(i);
-        if (flashcard != null) {
-          flashcardsToShow.add(MapEntry(key, flashcard));
-        }
-      }
-    }
-
-    // Safety check
-    if (flashcardsToShow.isEmpty) {
+    // Check if we need to generate quiz cards
+    if (_quizCards.isEmpty) {
+      _selectRandomFlashcards();
       return Scaffold(
         appBar: AppBar(
           title: const Text('Fun Quiz 🎨'),
           backgroundColor: Colors.deepPurple,
         ),
-        body: const Center(child: Text('No flashcards available')),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     // Ensure index is within bounds
-    if (_currentCardIndex >= flashcardsToShow.length) {
-      _currentCardIndex = flashcardsToShow.length - 1;
+    if (_currentCardIndex >= _quizCards.length) {
+      _currentCardIndex = _quizCards.length - 1;
     }
 
-    final entry = flashcardsToShow[_currentCardIndex];
+    final entry = _quizCards[_currentCardIndex];
     final key = entry.key;
     final flashcard = entry.value;
     final List<String> choices = _generateChoices(flashcard);
@@ -309,13 +313,6 @@ class _QuizPageState extends State<QuizPage> {
         hasAnswered &&
         flashcard.answer.trim().toLowerCase() ==
             selectedAnswer.trim().toLowerCase();
-
-    // Allow swiping if answer is correct
-    if (isCorrect && !_canSwipe) {
-      setState(() {
-        _canSwipe = true;
-      });
-    }
 
     // Calculate current progress
     double progressPercentage = _calculateProgress();
@@ -335,12 +332,9 @@ class _QuizPageState extends State<QuizPage> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: Icon(
-              _isShuffled ? Icons.sort : Icons.shuffle,
-              color: Colors.white,
-            ),
-            onPressed: _shuffleFlashcards,
-            tooltip: _isShuffled ? 'Reset Order' : 'Shuffle Questions',
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _selectRandomFlashcards,
+            tooltip: 'New Random Quiz',
           ),
         ],
       ),
@@ -363,7 +357,7 @@ class _QuizPageState extends State<QuizPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Question ${_currentCardIndex + 1} of ${flashcardsToShow.length}',
+                        'Question ${_currentCardIndex + 1} of ${_quizCards.length}',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -405,7 +399,7 @@ class _QuizPageState extends State<QuizPage> {
                   const SizedBox(height: 4),
                   // Progress percentage
                   Text(
-                    'Progress: ${progressPercentage.toStringAsFixed(1)}% (${_correctAnswers} correct out of ${flashcardsToShow.length})',
+                    'Progress: ${progressPercentage.toStringAsFixed(1)}% (${_correctAnswers} correct out of ${_quizCards.length})',
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.deepPurple.shade700,
@@ -423,10 +417,6 @@ class _QuizPageState extends State<QuizPage> {
                     if (details.primaryVelocity! < 0) {
                       // Swipe left-to-right: next card
                       _nextCard();
-                    } else if (details.primaryVelocity! > 0 &&
-                        _currentCardIndex > 0) {
-                      // Swipe right-to-left: previous card
-                      _previousCard();
                     }
                   } else if (isCorrect) {
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -563,7 +553,7 @@ class _QuizPageState extends State<QuizPage> {
                                       ),
                                       const SizedBox(width: 8),
                                       const Text(
-                                        'Try again',
+                                        'Moving to next question...',
                                         style: TextStyle(
                                           color: Colors.red,
                                           fontWeight: FontWeight.bold,
@@ -608,13 +598,13 @@ class _QuizPageState extends State<QuizPage> {
                                       ),
                                       child: ElevatedButton(
                                         onPressed: () {
-                                          if (!_canSwipe) {
-                                            // Only allow selection if not ready to swipe
-                                            setState(() {
-                                              userAnswers[key] = choice;
-                                              // Recalculate progress after answer
-                                              _calculateProgress();
-                                            });
+                                          if (!hasAnswered) {
+                                            // Only allow selection if not already answered
+                                            _handleAnswerSelection(
+                                              key,
+                                              choice,
+                                              flashcard,
+                                            );
                                           }
                                         },
                                         style: ElevatedButton.styleFrom(
@@ -673,24 +663,8 @@ class _QuizPageState extends State<QuizPage> {
                         Padding(
                           padding: const EdgeInsets.all(16.0),
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              ElevatedButton.icon(
-                                onPressed:
-                                    _currentCardIndex > 0
-                                        ? _previousCard
-                                        : null,
-                                icon: const Icon(Icons.arrow_back),
-                                label: const Text('Previous'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(
-                                    255,
-                                    133,
-                                    166,
-                                    153,
-                                  ),
-                                ),
-                              ),
                               ElevatedButton.icon(
                                 onPressed: _canSwipe ? _nextCard : null,
                                 icon: const Icon(Icons.arrow_forward),
