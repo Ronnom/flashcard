@@ -15,21 +15,46 @@ class _FlashcardPageState extends State<FlashcardPage> {
   final FlutterTts flutterTts = FlutterTts();
   List<int> _shuffledKeys = []; // Store the shuffled keys
   bool _isShuffled = false; // Track if we're in shuffled mode
+  bool _isInitialized = false; // Track initialization state
 
   @override
   void initState() {
     super.initState();
+    _loadFlashcards();
+  }
+
+  // Added separate loading function for clarity
+  Future<void> _loadFlashcards() async {
     flashcardBox = Hive.box<Flashcard>('flashcards');
 
-    // Check if the flashcard box is empty and populate it with predefined vocabulary words
+    // Debug: Print current state of the box
+    debugPrint('Current flashcard count: ${flashcardBox.length}');
+
+    // TEMPORARY: Force reinitialization for testing
+    // Remove this line after confirming changes are working
+    await flashcardBox.clear();
+
+    // Check if the flashcard box is empty and populate it
     if (flashcardBox.isEmpty) {
-      _initializeFlashcards();
+      await _initializeFlashcards();
+    }
+
+    // Debug: Verify data after initialization
+    debugPrint('Flashcard count after init: ${flashcardBox.length}');
+
+    // Set state to trigger UI rebuild
+    if (mounted) {
+      setState(() {
+        _isInitialized = true;
+      });
     }
   }
 
-  void _initializeFlashcards() {
+  Future<void> _initializeFlashcards() async {
     try {
-      flashcardBox.clear(); // Clear the box before adding new flashcards
+      debugPrint('Initializing flashcards...');
+      await flashcardBox.clear(); // Clear the box before adding new flashcards
+
       List<Flashcard> initialFlashcards = [
         Flashcard(
           category: 'Everyday Basics',
@@ -63,7 +88,8 @@ class _FlashcardPageState extends State<FlashcardPage> {
         ),
         Flashcard(
           category: 'Everyday Basics',
-          question: 'How fo you greet someone in the afternoon?',
+          question:
+              'How do you greet someone in the afternoon?', // Fixed typo: "fo" to "do"
           answer: 'Good Afternoon',
         ),
         Flashcard(
@@ -172,20 +198,25 @@ class _FlashcardPageState extends State<FlashcardPage> {
       ];
 
       for (var flashcard in initialFlashcards) {
-        flashcardBox.add(flashcard);
+        await flashcardBox.add(flashcard);
       }
-      setState(() {}); // Rebuild the UI
 
-      // Debug: Print all flashcards in the box
-      debugPrint('Flashcards in the box:');
-      for (var flashcard in flashcardBox.values) {
+      // Debug: Print some sample flashcards to verify
+      debugPrint('Sample flashcards added:');
+      for (int i = 0; i < min(5, flashcardBox.length); i++) {
+        final flashcard = flashcardBox.getAt(i);
         debugPrint(
-          '${flashcard.category}: ${flashcard.question} - ${flashcard.answer}',
+          '${flashcard?.category}: ${flashcard?.question} - ${flashcard?.answer}',
         );
       }
     } catch (e) {
       debugPrint("Error initializing flashcards: $e");
     }
+  }
+
+  // Helper function to get min value
+  int min(int a, int b) {
+    return a < b ? a : b;
   }
 
   void _shuffleFlashcards() {
@@ -223,6 +254,17 @@ class _FlashcardPageState extends State<FlashcardPage> {
     );
   }
 
+  // Added method to force reload flashcards (for testing)
+  void _forceReloadFlashcards() {
+    setState(() {
+      _loadFlashcards();
+    });
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Flashcards reloaded!')));
+  }
+
   Future<void> _speak(String text) async {
     try {
       await flutterTts.setLanguage("en-US");
@@ -250,6 +292,12 @@ class _FlashcardPageState extends State<FlashcardPage> {
         centerTitle: true,
         elevation: 0,
         actions: [
+          // Added reload button for testing
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _forceReloadFlashcards,
+            tooltip: 'Reload Flashcards',
+          ),
           IconButton(
             icon: Icon(
               _isShuffled ? Icons.sort : Icons.shuffle,
@@ -270,7 +318,10 @@ class _FlashcardPageState extends State<FlashcardPage> {
         ),
         child: Padding(
           padding: const EdgeInsets.all(8.0),
-          child: _buildCategoryList(),
+          child:
+              !_isInitialized
+                  ? const Center(child: CircularProgressIndicator())
+                  : _buildCategoryList(),
         ),
       ),
     );
