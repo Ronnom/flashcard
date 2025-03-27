@@ -151,7 +151,11 @@ class _QuizPageState extends State<QuizPage> {
                 ),
               ),
               TextButton(
-                onPressed: () => Navigator.pop(context),
+                onPressed: () {
+                  Navigator.pop(context);
+                  // Navigate back to homepage
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                },
                 child: const Text(
                   'OK',
                   style: TextStyle(fontSize: 18, color: Colors.deepPurple),
@@ -193,7 +197,11 @@ class _QuizPageState extends State<QuizPage> {
                 TextButton(
                   onPressed: () {
                     Navigator.pop(context); // Close the dialog
-                    submitQuiz(); // Automatically show the quiz results
+                    submitQuiz(); // Show the quiz results
+                    // After showing results, navigate back to homepage
+                    Future.delayed(const Duration(milliseconds: 500), () {
+                      Navigator.of(context).popUntil((route) => route.isFirst);
+                    });
                   },
                   child: const Text(
                     'OK',
